@@ -4,13 +4,8 @@ import "robot/comm/proto/comm.proto";
 
 package robot.board;
 
-// The controller that runs the low-level motor loop. The board type says
-// where that loop runs: an external MCU, the motor's own MCU (FEETECH_BUS),
-// the host itself (HOST_GPIO), or nowhere (MOCK).
-// Values name the native controller only — comm peripherals (e.g. an
-// EasyCAT shield) belong to Board.comm and drive peripherals (e.g. a
-// TB6600 stepper drive) to Channel.drive, never to the board type.
-// See docs/BOARD_LAYER_RFC.md §5.6 and §6.1.
+// Identifies the controller responsible for channel I/O. Communication and
+// drive selection are configured independently.
 enum BoardType {
   BOARD_INVALID = 0;
   AM243 = 1;
@@ -20,11 +15,20 @@ enum BoardType {
                     // servo's own MCU.
   HOST_GPIO = 5;    // No external controller; host pins drive the motor.
   MOCK = 6;         // Tests; channels are in-memory fakes.
-  ESP32 = 7;        // MCU running Joshua firmware, same joshua_wire_v1
-                    // family as TEENSY41 (docs/BOARD_LAYER_RFC.md §7.3).
+  ESP32 = 7;
 }
 
-// The drive leg: how the board moves the motor (docs/BOARD_LAYER_RFC.md §5.5).
+// Selects how a channel acquires input, independently of its meaning and
+// communication mechanism. A channel may provide input, output, or both.
+enum SignalInterface {
+  SIGNAL_INVALID = 0;
+  SERVO_BUS_REGISTER = 1;  // Feetech/Dynamixel present-position register read.
+  QUADRATURE = 2;          // A/B incremental encoder on MCU pins.
+  ANALOG_ADC = 3;          // Raw ADC count from an MCU pin.
+  PDO_SLOT = 4;            // Slot in a cyclic EtherCAT input image.
+}
+
+// Selects how a channel produces output.
 enum DriveInterface {
   DRIVE_INVALID = 0;
   STEP_DIR = 1;  // Pulse/direction stepper drive (TB6600, ...).
@@ -38,36 +42,17 @@ message StepDirConfig {
   uint32 max_pulse_rate_hz = 1;
   bool invert_dir = 2;
   bool enable_active_low = 3;
-  // GPIO pin mapping, pushed to firmware at Init() via CONFIGURE_CHANNEL —
-  // not baked into the firmware image (docs/BOARD_LAYER_RFC.md §7.5,
-  // revised: host-configured pins bring MCU-firmware boards in line with
-  // every other board type, all of which already put their hardware-
-  // addressing fact in config — AM243's PDO offsets, FeetechBusBoard's
-  // servo_id, HostGpioConfig's pins below). Values are MCU pin numbers
-  // (Arduino-style integer pin, e.g. Teensy 4.1's digital pin 2), specific
-  // to the exact firmware image flashed; IDENTIFY still catches a
-  // mismatched firmware/channel-count/drive-type, but cannot verify a pin
-  // number is physically wired the way config claims — that remains on
-  // whoever wires the board.
+  // MCU pin numbers sent to firmware during channel configuration.
   uint32 step_pin = 4;
   uint32 dir_pin = 5;
   uint32 enable_pin = 6;
-  // STEP pulse HIGH width in microseconds. Host-configurable for the same
-  // reason pins are: it's a fact about the specific STEP/DIR driver chip
-  // wired up (an opto-isolated input may need a wider pulse than a direct
-  // logic input), not something the firmware image should hardcode. 0
-  // (the default when unset) falls back to firmware's own default — 20us,
-  // conservative for a TB6600's opto-isolated 3.3V-driven input
-  // (firmware/teensy/41/src/backend_stepdir.cpp) — so existing configs
-  // that don't set this keep working unchanged.
+  // STEP pulse HIGH width in microseconds. Zero uses the firmware default.
   uint32 step_pulse_width_us = 7;
 }
 
 message ServoBusConfig {
   uint32 servo_id = 1;
-  // Feetech "Moving Time" register value (ms), pushed once as a
-  // CONFIGURE_CHANNEL tunable at board Init and bundled into every goal
-  // position write thereafter (docs/BOARD_LAYER_RFC.md §10 Phase 4).
+  // Moving-time register value in milliseconds.
   uint32 move_time_ms = 2;
 }
 
@@ -81,13 +66,15 @@ message HostGpioConfig {
   repeated uint32 pins = 2;  // Pin group on the host header.
 }
 
-// One motor slot on one board. Both wiring facts (e.g. StepDirConfig's
-// pins) and tunables are pushed at Init() via CONFIGURE_CHANNEL — see
-// StepDirConfig for why pins moved out of the firmware image
-// (docs/BOARD_LAYER_RFC.md §7.5).
+// One addressable input/output slot on a board.
 message Channel {
   uint32 index = 1;
+  // Output leg. DRIVE_INVALID for a sensor-only channel.
   DriveInterface drive = 2;
+  // Input leg. SIGNAL_INVALID for an actuator-only channel. Required for
+  // any channel a sensor binds to -- PerceptionFactory validates the
+  // sensor's meaning against it.
+  SignalInterface signal = 3;
   oneof drive_config {
     StepDirConfig step_dir = 10;
     ServoBusConfig servo_bus = 11;
@@ -103,9 +90,7 @@ message FirmwareSpec {
   uint32 min_proto_version = 1;
 }
 
-// Future home of the AM243 PDO mapping selector; mirrors
-// robot.action.Am243PdoMapping until the deprecated actuator-embedded
-// config is removed in Phase 4 (docs/BOARD_LAYER_RFC.md §10).
+// Selects the AM243 process-data layout.
 enum Am243PdoMapping {
   AM243_PDO_MAPPING_UNSPECIFIED = 0;
   AM243_PDO_MAPPING_TI_DEMO = 1;
