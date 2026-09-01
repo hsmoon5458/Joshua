@@ -7,9 +7,9 @@ cc_library(
     srcs = ["lds01_driver.cc"],
     hdrs = ["lds01_driver.h"],
     deps = [
-        "//config/proto:robot_cc_proto",
         "//robot/comm/interfaces:byte_stream",
         "//robot/perception/interfaces:lidar_interface",
+        "//robot/perception/proto:perception_cc_proto",
         "//robot/perception/proto:perception_packet_cc_proto",
         "//utils:status_macros",
         "@abseil-cpp//absl/status:status",

@@ -13,63 +13,21 @@
 #include "robot/board/factory/sensor_channel_validation.h"
 #include "robot/comm/factory/comm_factory.h"
 #include "robot/perception/camera/cv_camera.h"
-#include "robot/perception/encoder/sts3215_encoder.h"
 #include "robot/perception/interfaces/perception_interface.h"
 #include "robot/perception/lidar/lds01_driver.h"
-#include "robot/perception/sensors/joint_position_sensor.h"
+#include "robot/perception/position/position_sensor.h"
 #include "utils/status_macros.h"
 
 namespace robot::perception {
+
+// Creates sensors over either a board channel or a compatible transport
+// capability, as selected by configuration.
 class PerceptionFactory {
  public:
-  // Callers provide the configured boards used to resolve board-attached
-  // sensors.
   static absl::StatusOr<std::unique_ptr<robot::perception::PerceptionInterface>> CreatePerception(
       const robot::perception::SinglePerception& single_perception,
       const google::protobuf::RepeatedPtrField<robot::board::Board>& boards) {
-    if (single_perception.has_sensor()) {
-      return CreateSensor(single_perception.sensor(), boards);
-    }
-    switch (single_perception.perception_type()) {
-      case PerceptionType::CAMERA: {
-        const auto& camera = single_perception.camera();
-        return std::make_unique<CvCamera>(camera);
-      }
-      case PerceptionType::ENCODER: {
-        const auto& encoder_config = single_perception.encoder();
-        switch (encoder_config.encoder_type()) {
-          case EncoderType::STS3215_ENCODER: {
-            ABSL_ASSIGN_OR_RETURN(auto comm,
-                                  robot::comm::CommFactory::CreateComm(encoder_config.comm()));
-            ABSL_ASSIGN_OR_RETURN(
-                auto transport, robot::comm::GetCommTransport<robot::comm::MessageTransport>(comm));
-            auto encoder = std::make_unique<Sts3215Encoder>(transport, encoder_config);
-            ABSL_RETURN_IF_ERROR(encoder->Init());
-            return encoder;
-          }
-          default:
-            return absl::InvalidArgumentError("Invalid encoder type.");
-        }
-      }
-      case PerceptionType::LIDAR: {
-        const auto& lidar_config = single_perception.lidar();
-        switch (lidar_config.lidar_type()) {
-          case LidarType::LDS01: {
-            ABSL_ASSIGN_OR_RETURN(auto comm,
-                                  robot::comm::CommFactory::CreateComm(lidar_config.comm()));
-            ABSL_ASSIGN_OR_RETURN(auto stream,
-                                  robot::comm::GetCommTransport<robot::comm::ByteStream>(comm));
-            auto lidar = std::make_unique<Lds01Driver>(stream, lidar_config);
-            ABSL_RETURN_IF_ERROR(lidar->Init());
-            return lidar;
-          }
-          default:
-            return absl::InvalidArgumentError("Invalid lidar type.");
-        }
-      }
-      default:
-        return absl::InvalidArgumentError("Invalid perception type.");
-    }
+    return CreateSensor(single_perception.sensor(), boards);
   }
 
   ~PerceptionFactory() = default;
@@ -105,11 +63,7 @@ class PerceptionFactory {
                        "device."));
     }
 
-    if (!on_board) {
-      return absl::UnimplementedError(
-          absl::StrCat(owner, ": single-stream devices have not moved to Sensor yet."));
-    }
-    return CreateBoardSensor(sensor, boards, owner);
+    return on_board ? CreateBoardSensor(sensor, boards, owner) : CreateDeviceSensor(sensor, owner);
   }
 
   // Resolves and validates a board-attached sensor channel.
@@ -127,8 +81,8 @@ class PerceptionFactory {
     ABSL_ASSIGN_OR_RETURN(auto channel, board->OpenChannel(sensor.channel()));
 
     switch (sensor.sensor_type()) {
-      case robot::perception::SensorType::JOINT_POSITION:
-        return std::make_unique<JointPositionSensor>(channel, sensor);
+      case robot::perception::SensorType::POSITION:
+        return std::make_unique<PositionSensor>(channel, sensor);
       default:
         return absl::UnimplementedError(
             absl::StrCat(owner,
@@ -136,6 +90,49 @@ class PerceptionFactory {
                          robot::perception::SensorType_Name(sensor.sensor_type()),
                          " has no board-attached sensor driver yet."));
     }
+  }
+
+  // Creates a sensor from its device-specific configuration.
+  static absl::StatusOr<std::unique_ptr<robot::perception::PerceptionInterface>> CreateDeviceSensor(
+      const robot::perception::Sensor& sensor, const std::string& owner) {
+    switch (sensor.sensor_config_case()) {
+      case robot::perception::Sensor::kOpencvConfig: {
+        ABSL_RETURN_IF_ERROR(RequireSensorType(
+            sensor, robot::perception::SensorType::IMAGE, owner, "opencv_config"));
+        return std::make_unique<CvCamera>(sensor);
+      }
+      case robot::perception::Sensor::kLds01Config: {
+        ABSL_RETURN_IF_ERROR(RequireSensorType(
+            sensor, robot::perception::SensorType::RANGE_SCAN, owner, "lds01_config"));
+        ABSL_ASSIGN_OR_RETURN(auto comm, robot::comm::CommFactory::CreateComm(sensor.comm()));
+        ABSL_ASSIGN_OR_RETURN(auto stream,
+                              robot::comm::GetCommTransport<robot::comm::ByteStream>(comm));
+        auto lidar = std::make_unique<Lds01Driver>(stream, sensor);
+        ABSL_RETURN_IF_ERROR(lidar->Init());
+        return lidar;
+      }
+      case robot::perception::Sensor::SENSOR_CONFIG_NOT_SET:
+      default:
+        return absl::InvalidArgumentError(absl::StrCat(owner, " has no device config."));
+    }
+  }
+
+  static absl::Status RequireSensorType(const robot::perception::Sensor& sensor,
+                                        robot::perception::SensorType expected,
+                                        const std::string& owner,
+                                        const std::string& config_name) {
+    if (sensor.sensor_type() == expected) {
+      return absl::OkStatus();
+    }
+    return absl::InvalidArgumentError(
+        absl::StrCat(owner,
+                     " sets ",
+                     config_name,
+                     ", which produces ",
+                     robot::perception::SensorType_Name(expected),
+                     ", but declares sensor_type ",
+                     robot::perception::SensorType_Name(sensor.sensor_type()),
+                     "."));
   }
 
   PerceptionFactory() = default;

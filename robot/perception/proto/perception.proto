@@ -16,74 +16,12 @@ enum SensorType {
   FORCE_TORQUE = 5;
 }
 
-enum PerceptionType {
-  PERCEPTION_INVALID = 0;
-  CAMERA = 1;
-  ENCODER = 2;
-  LIDAR = 3;
-  RADAR = 4;
-  HID = 5;  // Human Interface Device
-}
-
-enum CameraType {
-  CAMERA_INVLAID = 0;
-  OPENCV = 1;
-}
-
-enum EncoderType {
-  ENCODER_INVLAID = 0;
-  STS3215_ENCODER = 1;
-}
-
-enum LidarType {
-  LIDAR_INVLAID = 0;
-  LDS01 = 1;
-}
-
-enum RadarType { RADAR_INVLAID = 0; }
-
-enum HidType { HID_INVLAID = 0; }
-
-message Camera {
-  string camera_name = 1;
-  uint64 id = 2;
-  CameraType camera_type = 3;
-  robot.comm.Comm comm = 4;
-  oneof camera_config {
-    OpenCvConfig opencv_config = 6;
-  }
-}
-
-message Encoder {
-  string encoder_name = 1;
-  uint64 id = 2;
-  EncoderType encoder_type = 3;
-  robot.comm.Comm comm = 4;
-  float operational_lower_limit = 5;
-  float operational_upper_limit = 6;
-  oneof encoder_config {
-    Sts3215EncoderConfig sts3215_encoder_config = 9;
-  }
-}
-
-message Lidar {
-  string lidar_name = 1;
-  uint64 id = 2;
-  LidarType lidar_type = 3;
-  robot.comm.Comm comm = 4;
-  // TODO(hmoon): Add more spec here.
-}
-
 message OpenCvConfig {
   uint64 id = 1;
   uint32 width = 2;
   uint32 height = 3;
   uint32 fps = 4;
   string fourcc = 5;
-}
-
-message Sts3215EncoderConfig {
-  uint64 servo_id = 1;
 }
 
 // The message presence selects the LDS-01 driver.
@@ -114,13 +52,9 @@ message Sensor {
 
 message SinglePerception {
   ros2.node.Node node = 1;
-  // Deprecated device-family discriminator.
-  PerceptionType perception_type = 2;
-  oneof perception_data {
-    Camera camera = 3;
-    Encoder encoder = 4;
-    Lidar lidar = 5;
-  }
+  // Reserved fields from the previous perception schema.
+  reserved 2, 3, 4, 5;
+  reserved "perception_type", "camera", "encoder", "lidar";
   Sensor sensor = 6;
 }
 

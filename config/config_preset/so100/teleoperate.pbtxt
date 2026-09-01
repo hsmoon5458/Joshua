@@ -212,7 +212,7 @@ robot {
       sensor {
         sensor_name: "sts3215_encoder_1"
         id: 1
-        sensor_type: JOINT_POSITION
+        sensor_type: POSITION
         operational_lower_limit: 1147
         operational_upper_limit: 3154
         board_name: "arm_bus"
@@ -233,7 +233,7 @@ robot {
       sensor {
         sensor_name: "sts3215_encoder_2"
         id: 2
-        sensor_type: JOINT_POSITION
+        sensor_type: POSITION
         operational_lower_limit: 1670
         operational_upper_limit: 3986
         board_name: "arm_bus"
@@ -254,7 +254,7 @@ robot {
       sensor {
         sensor_name: "sts3215_encoder_3"
         id: 3
-        sensor_type: JOINT_POSITION
+        sensor_type: POSITION
         operational_lower_limit: 910
         operational_upper_limit: 3113
         board_name: "arm_bus"
@@ -275,7 +275,7 @@ robot {
       sensor {
         sensor_name: "sts3215_encoder_4"
         id: 4
-        sensor_type: JOINT_POSITION
+        sensor_type: POSITION
         operational_lower_limit: 20
         operational_upper_limit: 2407
         board_name: "arm_bus"
@@ -296,7 +296,7 @@ robot {
       sensor {
         sensor_name: "sts3215_encoder_5"
         id: 5
-        sensor_type: JOINT_POSITION
+        sensor_type: POSITION
         operational_lower_limit: 1730
         operational_upper_limit: 3811
         board_name: "arm_bus"
@@ -317,7 +317,7 @@ robot {
       sensor {
         sensor_name: "sts3215_encoder_6"
         id: 6
-        sensor_type: JOINT_POSITION
+        sensor_type: POSITION
         operational_lower_limit: 2028
         operational_upper_limit: 3100
         board_name: "arm_bus"

@@ -44,15 +44,23 @@ TEST(ConfigValidationTest, EverySensorResolves) {
     auto config = config::config_util::LoadConfig(config_path);
     ASSERT_TRUE(config.ok()) << config_path << ": " << config.status().message();
 
-    for (const auto& single_perception : config->robot().perceptions().single_perceptions()) {
-      if (!single_perception.has_sensor()) {
-        continue;  // Still on the pre-board-layer shape; migrates with it.
+    for (const auto& board : config->robot().boards()) {
+      if (board.has_comm()) {
+        EXPECT_NE(board.comm().transport_type(), robot::comm::TransportType::TRANSPORT_INVALID)
+            << config_path << ": board '" << board.name() << "' has no transport_type.";
       }
+    }
+
+    for (const auto& single_perception : config->robot().perceptions().single_perceptions()) {
       const auto& sensor = single_perception.sensor();
       const std::string where = config_path + ": sensor '" + sensor.sensor_name() + "'";
 
       ASSERT_NE(sensor.sensor_type(), robot::perception::SensorType::SENSOR_INVALID)
           << where << " has no sensor_type.";
+      if (sensor.has_comm()) {
+        EXPECT_NE(sensor.comm().transport_type(), robot::comm::TransportType::TRANSPORT_INVALID)
+            << where << " has no transport_type.";
+      }
 
       const bool on_board = !sensor.board_name().empty();
       const bool has_device_config =

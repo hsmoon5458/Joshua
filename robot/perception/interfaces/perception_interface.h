@@ -9,6 +9,7 @@
 
 namespace robot::perception {
 
+// Common lifecycle and sampling interface for all sensors.
 class PerceptionInterface {
  public:
   PerceptionInterface() = default;

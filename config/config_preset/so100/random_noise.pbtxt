@@ -209,12 +209,10 @@ robot {
           publish_rate_hz: 30
         }
       }
-      perception_type: CAMERA
-      camera {
-        camera_name: "webcam"
+      sensor {
+        sensor_name: "webcam"
         id: 1
-        camera_type: OPENCV
-        comm{}
+        sensor_type: IMAGE
         opencv_config {
           id: 0
           width: 640
@@ -224,7 +222,6 @@ robot {
       }
     }
   }
-
 }
 
 ai {

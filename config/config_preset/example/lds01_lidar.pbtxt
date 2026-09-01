@@ -4,7 +4,7 @@ general{
     name: "lds01_lidar_test"
     id: 1
   }
-  
+
   robot {
     perceptions {
       single_perceptions {
@@ -18,11 +18,10 @@ general{
             publish_rate_hz: 3
           }
         }
-        perception_type: LIDAR
-        lidar {
-          lidar_name: "lds01_lidar_1"
+        sensor {
+          sensor_name: "lds01_lidar_1"
           id: 1
-          lidar_type: LDS01
+          sensor_type: RANGE_SCAN
           comm {
             comm_type: SERIAL
             transport_type: BYTE_STREAM
@@ -31,7 +30,8 @@ general{
               port: "/dev/ttyUSB0"
               baudrate: 230400
             }
-          }          
+          }
+          lds01_config {}
         }
       }
     }

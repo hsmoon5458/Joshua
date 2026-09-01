@@ -209,12 +209,10 @@ robot {
           publish_rate_hz: 30
         }
       }
-      perception_type: CAMERA
-      camera {
-        camera_name: "webcam"
+      sensor {
+        sensor_name: "webcam"
         id: 1
-        camera_type: OPENCV
-        comm{}
+        sensor_type: IMAGE
         opencv_config {
           id: 0
           width: 640
@@ -237,7 +235,7 @@ robot {
       sensor {
         sensor_name: "sts3215_encoder_1"
         id: 1
-        sensor_type: JOINT_POSITION
+        sensor_type: POSITION
         operational_lower_limit: 973
         operational_upper_limit: 3034
         board_name: "arm_bus"
@@ -258,7 +256,7 @@ robot {
       sensor {
         sensor_name: "sts3215_encoder_2"
         id: 2
-        sensor_type: JOINT_POSITION
+        sensor_type: POSITION
         operational_lower_limit: 858
         operational_upper_limit: 3154
         board_name: "arm_bus"
@@ -279,7 +277,7 @@ robot {
       sensor {
         sensor_name: "sts3215_encoder_3"
         id: 3
-        sensor_type: JOINT_POSITION
+        sensor_type: POSITION
         operational_lower_limit: 798
         operational_upper_limit: 3015
         board_name: "arm_bus"
@@ -300,7 +298,7 @@ robot {
       sensor {
         sensor_name: "sts3215_encoder_4"
         id: 4
-        sensor_type: JOINT_POSITION
+        sensor_type: POSITION
         operational_lower_limit: 640
         operational_upper_limit: 3124
         board_name: "arm_bus"
@@ -321,7 +319,7 @@ robot {
       sensor {
         sensor_name: "sts3215_encoder_5"
         id: 5
-        sensor_type: JOINT_POSITION
+        sensor_type: POSITION
         operational_lower_limit: 902
         operational_upper_limit: 2955
         board_name: "arm_bus"
@@ -342,7 +340,7 @@ robot {
       sensor {
         sensor_name: "sts3215_encoder_6"
         id: 6
-        sensor_type: JOINT_POSITION
+        sensor_type: POSITION
         operational_lower_limit: 1795
         operational_upper_limit: 3235
         board_name: "arm_bus"

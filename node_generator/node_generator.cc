@@ -11,7 +11,10 @@
 #include <chrono>
 #include <cstdlib>
 #include <filesystem>
+#include <map>
 #include <mutex>
+#include <set>
+#include <string>
 #include <thread>
 
 #include "config/config_utils.h"
@@ -303,40 +306,57 @@ absl::Status NodeGenerator::IdentifyNodeTypes() {
 
 absl::Status NodeGenerator::CheckConfigIntegrity() {
   auto robot_config = config_.robot();
+
+  // A serial port may be opened by exactly one node process. Single-stream
+  // sensors (a camera, a lidar) carry their own comm, so their ports are
+  // checked directly.
   std::map<std::string, uint32_t> port_to_node_id;
-
-  // Helper lambda to extract serial port from a perception's config if it exists.
-  auto get_serial_port = [](const auto& perception_details) -> std::string {
-    if (perception_details.comm().comm_type() == robot::comm::CommType::SERIAL) {
-      return perception_details.comm().serial_config().port();
-    }
-    return "";
-  };
-
-  // Check for serial port conflicts among all perception devices.
-  // This ensures a single physical port is not managed by multiple node processes.
   for (const auto& single_perception : robot_config.perceptions().single_perceptions()) {
-    uint32_t node_id = single_perception.node().id();
-    std::string port_name;
-
-    if (single_perception.has_camera()) {
-      port_name = get_serial_port(single_perception.camera());
-    } else if (single_perception.has_encoder()) {
-      port_name = get_serial_port(single_perception.encoder());
+    const auto& sensor = single_perception.sensor();
+    if (sensor.comm().comm_type() != robot::comm::CommType::SERIAL) {
+      continue;
     }
+    const std::string& port_name = sensor.comm().serial_config().port();
+    if (port_name.empty()) {
+      continue;
+    }
+    const uint32_t node_id = single_perception.node().id();
+    auto [it, inserted] = port_to_node_id.try_emplace(port_name, node_id);
+    if (!inserted && it->second != node_id) {
+      LOG(ERROR) << "Configuration Integrity Failure: Serial port '" << port_name
+                 << "' is assigned to multiple node_ids (" << it->second << " and " << node_id
+                 << "). This is not allowed as it will cause resource conflicts.";
+      return absl::Status(absl::StatusCode::kInvalidArgument, "Serial port conflict");
+    }
+  }
 
-    if (!port_name.empty()) {
-      if (port_to_node_id.count(port_name)) {
-        if (port_to_node_id[port_name] != node_id) {
-          LOG(ERROR) << "Configuration Integrity Failure: Serial port '" << port_name
-                     << "' is assigned to multiple node_ids (" << port_to_node_id[port_name]
-                     << " and " << node_id
-                     << "). This is not allowed as it will cause resource conflicts.";
-          return absl::Status(absl::StatusCode::kInvalidArgument, "Serial port conflict");
+  // Board synchronization is process-local, so report boards claimed by
+  // multiple node processes.
+  std::map<std::string, std::set<uint32_t>> board_claimants;
+  for (const auto& single_action : robot_config.actions().single_actions()) {
+    const auto& board_name = single_action.actuator().board_name();
+    if (!board_name.empty()) {
+      board_claimants[board_name].insert(single_action.node().id());
+    }
+  }
+  for (const auto& single_perception : robot_config.perceptions().single_perceptions()) {
+    const auto& board_name = single_perception.sensor().board_name();
+    if (!board_name.empty()) {
+      board_claimants[board_name].insert(single_perception.node().id());
+    }
+  }
+  for (const auto& [board_name, node_ids] : board_claimants) {
+    if (node_ids.size() > 1) {
+      std::string ids;
+      for (const uint32_t node_id : node_ids) {
+        if (!ids.empty()) {
+          ids += ", ";
         }
-      } else {
-        port_to_node_id[port_name] = node_id;
+        ids += std::to_string(node_id);
       }
+      LOG(WARNING) << "Board '" << board_name << "' is claimed by node_ids (" << ids
+                   << "). Each node runs in its own process, so the board's bus mutex cannot "
+                      "serialize them and traffic on its link will interleave.";
     }
   }
 
