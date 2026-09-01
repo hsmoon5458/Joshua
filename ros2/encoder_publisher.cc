@@ -63,9 +63,9 @@ class EncoderPublisher : public rclcpp::Node {
           single_perception, config.robot().boards());
       if (!interface.ok()) {
         RCLCPP_ERROR(this->get_logger(),
-                     "Failed to create perception interface for encoder '%s'. Check hardware "
-                     "connection or permissions.",
-                     sensor_name.c_str());
+                     "Failed to create perception interface for encoder '%s': %s",
+                     sensor_name.c_str(),
+                     std::string(interface.status().message()).c_str());
         continue;
       }
 
