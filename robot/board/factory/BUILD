@@ -47,6 +47,29 @@ cc_library(
     ],
 )
 
+cc_library(
+    name = "sensor_channel_validation",
+    srcs = ["sensor_channel_validation.cc"],
+    hdrs = ["sensor_channel_validation.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//robot/board/proto:board_cc_proto",
+        "//robot/perception/proto:perception_cc_proto",
+        "@abseil-cpp//absl/status:status",
+        "@abseil-cpp//absl/strings",
+    ],
+)
+
+cc_test(
+    name = "sensor_channel_validation_test",
+    srcs = ["sensor_channel_validation_test.cc"],
+    deps = [
+        ":sensor_channel_validation",
+        "@abseil-cpp//absl/status:status",
+        "@googletest//:gtest_main",
+    ],
+)
+
 cc_test(
     name = "board_factory_test",
     srcs = ["board_factory_test.cc"],
