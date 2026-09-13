@@ -12,15 +12,15 @@ namespace {
 constexpr auto kReadAttempt = 50;
 }
 
-Sts3215Encoder::Sts3215Encoder(const std::shared_ptr<robot::comm::Serial>& serial,
+Sts3215Encoder::Sts3215Encoder(const std::shared_ptr<robot::comm::MessageTransport>& transport,
                                const robot::perception::Encoder& encoder_config)
-    : serial_(serial) {
+    : transport_(transport) {
   servo_id_ = encoder_config.sts3215_encoder_config().servo_id();
   id_ = GetId();
 }
 
 absl::Status Sts3215Encoder::Init() {
-  ABSL_RETURN_IF_ERROR(serial_->Open());
+  ABSL_RETURN_IF_ERROR(transport_->Open());
   return absl::OkStatus();
 }
 
@@ -86,12 +86,12 @@ absl::StatusOr<uint16_t> Sts3215Encoder::read_servo_position() {
   // reading which is hard to make atomic without a custom callback or a very specific Serial
   // method.
 
-  // Compromise: We try to read 8 bytes directly using AtomicRead.
+  // Read the fixed-size status packet in one atomic exchange.
   // If the servo responds cleanly after the flush/write, it should work.
   // If it's out of sync, we might fail. But locking the bus prevents the MAIN cause of sync loss
   // (interleaved writes).
 
-  ABSL_ASSIGN_OR_RETURN(auto response, serial_->AtomicRead(packet, 8));
+  ABSL_ASSIGN_OR_RETURN(auto response, transport_->SendAndReceive(packet, 8));
 
   // 3. Validate response
   if (response.size() != 8) {

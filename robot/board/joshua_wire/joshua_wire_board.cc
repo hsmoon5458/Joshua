@@ -5,7 +5,6 @@
 #include <vector>
 
 #include "absl/strings/str_cat.h"
-#include "robot/board/frame/serial_frame_transport.h"
 #include "robot/comm/factory/comm_factory.h"
 #include "utils/status_macros.h"
 
@@ -56,13 +55,7 @@ absl::StatusOr<jw1_drive_t> ToWireDrive(robot::board::DriveInterface drive) {
   }
 }
 
-// One channel over a joshua_wire_v1 FrameTransport, generic across every
-// drive the wire protocol can carry — the wire itself only ever moves
-// mode+value/position/velocity/fault-flags, never a drive-specific shape,
-// so nothing here depends on which DriveInterface this channel actually
-// is. The wire protocol carries native units only (steps, ticks, ...);
-// unit conversion lives in the motor driver, matching every other board
-// (docs/BOARD_LAYER_RFC.md §5.3).
+// One addressable channel over a joshua_wire_v1 frame transport.
 class JoshuaWireChannel : public BoardChannel {
  public:
   JoshuaWireChannel(std::shared_ptr<FrameTransport> transport, uint8_t channel_index)
@@ -82,11 +75,7 @@ class JoshuaWireChannel : public BoardChannel {
 
   absl::Status SetTarget(TargetMode mode, float value) override {
     if (mode == TargetMode::kTorque) {
-      // A board that cannot do a mode returns UnimplementedError from it
-      // (docs/BOARD_LAYER_RFC.md §12.7, mirrors FeetechBusChannel). No
-      // joshua_wire_v1 drive has a continuous torque target today — every
-      // channel is open-loop position/velocity — so this is unconditional
-      // here rather than per-drive.
+      // The protocol does not define a continuous torque target.
       return absl::UnimplementedError(
           "joshua_wire_v1 channel has no torque target (open-loop drive).");
     }
@@ -207,13 +196,17 @@ absl::Status JoshuaWireBoard::ValidateComm(const robot::comm::Comm& comm,
     return absl::InvalidArgumentError(
         absl::StrCat("Board '", board_name, "' requires SERIAL comm config."));
   }
+  if (comm.transport_type() != robot::comm::TransportType::MESSAGE) {
+    return absl::InvalidArgumentError(
+        absl::StrCat("Board '", board_name, "' requires MESSAGE transport."));
+  }
   return absl::OkStatus();
 }
 
 absl::StatusOr<std::shared_ptr<FrameTransport>> JoshuaWireBoard::CreateTransport(
     const robot::comm::Comm& comm) const {
-  ABSL_ASSIGN_OR_RETURN(auto serial, robot::comm::CommFactory::CreateSerial(comm));
-  return std::make_shared<SerialFrameTransport>(std::move(serial));
+  ABSL_ASSIGN_OR_RETURN(auto transport, robot::comm::CommFactory::CreateComm(comm));
+  return robot::comm::GetCommTransport<robot::comm::MessageTransport>(transport);
 }
 
 absl::Status JoshuaWireBoard::ValidateConfig(const robot::board::Board& config) const {
@@ -308,12 +301,8 @@ absl::Status JoshuaWireBoard::ValidateConfig(const robot::board::Board& config) 
   return absl::OkStatus();
 }
 
-// IDENTIFY handshake: board_id, protocol version, and per-channel drive
-// capability must all agree with config, or Init() fails now instead of
-// the first SET_TARGET silently landing on the wrong channel or the wrong
-// device. No firmware-name check — a free-form name string isn't a
-// generalizable compatibility check (docs/BOARD_LAYER_RFC.md §7.5); these
-// structural facts, reported by the firmware itself, are.
+// Validates the board identity, protocol version, and channel capabilities
+// reported by firmware against configuration.
 absl::Status JoshuaWireBoard::IdentifyAndValidate(FrameTransport& transport,
                                                   const robot::board::Board& config) const {
   uint8_t request[JW1_MAX_FRAME_LEN];

@@ -6,7 +6,7 @@ cc_library(
     hdrs = ["sts3215_encoder.h"],
     visibility = ["//visibility:public"],
     deps = [
-        "//robot/comm/serial",
+        "//robot/comm/interfaces:message_transport",
         "//robot/perception/interfaces:encoder_interface",
         "//robot/perception/proto:perception_cc_proto",
         "//robot/perception/proto:perception_packet_cc_proto",

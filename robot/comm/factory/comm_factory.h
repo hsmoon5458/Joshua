@@ -6,39 +6,44 @@
 #include <mutex>
 #include <string>
 #include <utility>
+#include <variant>
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "robot/comm/ethercat/ethercat_transport.h"
+#include "robot/comm/interfaces/byte_stream.h"
+#include "robot/comm/interfaces/message_transport.h"
 #include "robot/comm/proto/comm.pb.h"
 #include "robot/comm/serial/serial.h"
 
 namespace robot::comm {
 
+using CommTransport = std::variant<std::shared_ptr<ByteStream>,
+                                   std::shared_ptr<MessageTransport>,
+                                   std::shared_ptr<robot::comm::ethercat::EthercatTransport>>;
+
+template <typename Transport>
+absl::StatusOr<std::shared_ptr<Transport>> GetCommTransport(const CommTransport& transport) {
+  const auto* selected = std::get_if<std::shared_ptr<Transport>>(&transport);
+  if (selected == nullptr) {
+    return absl::InvalidArgumentError("Configured comm does not provide the requested transport.");
+  }
+  return *selected;
+}
+
 class CommFactory {
  public:
-  static absl::StatusOr<std::shared_ptr<Serial>> CreateSerial(const robot::comm::Comm& comm);
+  static absl::StatusOr<CommTransport> CreateComm(const robot::comm::Comm& config);
 
-  // TODO(docs/BOARD_LAYER_RFC.md §7.3/§10 Phase 5): CreateUdp, for boards
-  // whose CommType is ETHERNET_UDP (already reserved in comm.proto) — not
-  // built yet, no UDP-based board exists. Would return a UdpTransport
-  // (new class, mirrors Serial's interface) for
-  // robot::board::UdpFrameTransport (new class, mirrors
-  // robot/board/frame/serial_frame_transport.*) to wrap — see
-  // JoshuaWireBoard::CreateTransport()'s doc comment for the
-  // rest of the seam this plugs into. Firmware side needs a matching
-  // transport_udp.cpp (W5500 or similar), implementing the same
-  // TransportInit/TransportReadFrame/TransportWriteFrame shape
-  // transport_serial.cpp does today — main.cpp's dispatch loop needs no
-  // changes either way, which is the point of this seam.
+  static absl::StatusOr<std::shared_ptr<Serial>> CreateSerial(
+      const robot::comm::SerialConfig& config);
 
   // Returns a cached instance per interface name — an EtherCAT NIC has
   // exactly one master, and two ecx_init()s on one NIC fight over the raw
-  // socket (docs/BOARD_LAYER_RFC.md §5.3). The first call for an interface
-  // opens the SOEM master; later calls return the same transport and fail
-  // if they request a different process-data mode.
-  static absl::StatusOr<std::shared_ptr<robot::comm::ethercat::EthercatTransport>>
-  CreateEthercatTransport(const robot::comm::Comm& comm);
+  // socket. Later calls return the same transport and fail if they request a
+  // different process-data mode.
+  static absl::StatusOr<std::shared_ptr<robot::comm::ethercat::EthercatTransport>> CreateEthercat(
+      const robot::comm::EthercatConfig& config);
 
   // Replaces the SOEM transport constructor so cache semantics are testable
   // without a NIC. Pass nullptr to restore the default. For tests.

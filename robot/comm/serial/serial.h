@@ -9,34 +9,44 @@
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "robot/comm/interfaces/byte_stream.h"
+#include "robot/comm/interfaces/message_transport.h"
 
 namespace robot::comm {
 
-// Byte-level transport boundary that bus-protocol boards (e.g.
-// FeetechBusBoard) depend on, so their protocol logic is testable without a
-// real serial port (docs/BOARD_LAYER_RFC.md §5.6). Serial is the only
-// production implementation; fakes implement this directly.
-class SerialTransport {
+// Serial request/response capability with an atomic write-then-read operation
+// for shared half-duplex buses.
+class SerialTransport : public MessageTransport {
  public:
   virtual ~SerialTransport() = default;
-  virtual absl::Status Write(const std::vector<uint8_t>& data) = 0;
+  absl::Status Open() override {
+    return absl::OkStatus();
+  }
+  virtual absl::Status Write(const std::vector<uint8_t>& data) override = 0;
   // Atomic Write-then-Read operation to prevent bus collisions.
   virtual absl::StatusOr<std::vector<uint8_t>> AtomicRead(const std::vector<uint8_t>& command,
                                                           size_t expected_response_size) = 0;
+
+  absl::StatusOr<std::vector<uint8_t>> SendAndReceive(const std::vector<uint8_t>& request,
+                                                      size_t expected_response_size) final {
+    return AtomicRead(request, expected_response_size);
+  }
 };
 
-class Serial : public SerialTransport {
+// A serial mechanism can provide both an ordered byte stream and atomic
+// request/response operations.
+class Serial : public SerialTransport, public ByteStream {
  public:
   Serial(std::shared_ptr<boost::asio::io_context> io, std::string uart_port, int uart_baudrate);
   ~Serial();
   absl::Status Write(const std::vector<uint8_t>& data) override;
-  absl::StatusOr<std::vector<uint8_t>> Read(size_t bytes_to_read);
+  absl::StatusOr<std::vector<uint8_t>> Read(size_t bytes_to_read) override;
 
   absl::StatusOr<std::vector<uint8_t>> AtomicRead(const std::vector<uint8_t>& command,
                                                   size_t expected_response_size) override;
 
   absl::Status Flush();
-  absl::Status Open();
+  absl::Status Open() override;
 
  private:
   std::string uart_port_;

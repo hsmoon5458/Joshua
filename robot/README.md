@@ -61,9 +61,7 @@ selects between backends.
 
 ## Before you change this
 
-The board layer is a staged migration — read
-[docs/BOARD_LAYER_RFC.md](../docs/BOARD_LAYER_RFC.md) before adding a motor
-type, a board, or a transport, and check which phase has landed. Adding one of
-those should mean **one new file in one layer**, not a new enum value threaded
-through several. EtherCAT specifics are in
-[comm/ethercat/README.md](comm/ethercat/README.md).
+Adding a motor type, board, or transport should mean **one new file in one
+layer**, not a new enum value threaded through several. Communication mechanism
+and capability boundaries are described in [comm/README.md](comm/README.md).
+EtherCAT specifics are in [comm/ethercat/README.md](comm/ethercat/README.md).

@@ -16,8 +16,8 @@
 
 namespace robot::board {
 
-// Shared host-side implementation of the joshua_wire_v1 board contract
-// (docs/BOARD_LAYER_RFC.md §7.2/§7.3/§7.5): open a FrameTransport, run the
+// Shared host-side implementation of the joshua_wire_v1 board contract:
+// open a FrameTransport, run the
 // IDENTIFY handshake (board_id, protocol version, per-channel drive all
 // cross-checked against config), push CONFIGURE_CHANNEL for every channel,
 // then dispatch ENABLE/DISABLE/SET_TARGET/GET_FEEDBACK per channel. Every
@@ -57,8 +57,7 @@ class JoshuaWireBoard : public BoardInterface {
   absl::Status Teardown() final;
 
   // Replaces the FrameTransport so the IDENTIFY/CONFIGURE_CHANNEL handshake
-  // and channel dispatch are testable without real hardware
-  // (docs/BOARD_LAYER_RFC.md §7.3). Pass nullptr to restore each
+  // and channel dispatch are testable without real hardware. Pass nullptr to restore each
   // subclass's real CreateTransport() path. Shared by every
   // subclass (one process-wide test seam, reset in TearDown) — safe as
   // long as tests run serially, which is gtest's default and already the
@@ -75,13 +74,7 @@ class JoshuaWireBoard : public BoardInterface {
   virtual absl::Status ValidateComm(const robot::comm::Comm& comm,
                                     const std::string& board_name) const;
 
-  // Builds the real (non-test) transport. Default opens
-  // CommFactory::CreateSerial + SerialFrameTransport; override alongside
-  // ValidateComm if a future variant's comm type differs. TODO(docs/
-  // BOARD_LAYER_RFC.md §7.3/§10 Phase 5): a UDP-based board would override
-  // this to build a UdpFrameTransport over CommFactory::CreateUdp instead
-  // — see the TODOs on both of those (robot/board/frame/frame_transport.h,
-  // robot/comm/factory/comm_factory.h) for what's not built yet.
+  // Creates the configured message transport through CommFactory.
   virtual absl::StatusOr<std::shared_ptr<FrameTransport>> CreateTransport(
       const robot::comm::Comm& comm) const;
 

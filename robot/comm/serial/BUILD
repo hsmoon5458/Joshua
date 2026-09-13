@@ -6,6 +6,8 @@ cc_library(
     hdrs = ["serial.h"],
     visibility = ["//visibility:public"],
     deps = [
+        "//robot/comm/interfaces:byte_stream",
+        "//robot/comm/interfaces:message_transport",
         "@abseil-cpp//absl/status:status",
         "@abseil-cpp//absl/status:statusor",
         "@boost.asio",

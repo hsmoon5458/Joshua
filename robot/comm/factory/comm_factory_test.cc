@@ -15,6 +15,7 @@ using robot::comm::ethercat::FakeEthercatTransport;
 robot::comm::Comm MakeEthercatComm() {
   robot::comm::Comm comm;
   comm.set_comm_type(robot::comm::CommType::ETHERCAT);
+  comm.set_transport_type(robot::comm::TransportType::CYCLIC);
   auto* config = comm.mutable_ethercat_config();
   config->set_interface_name("joshua-no-such-ethercat-iface0");
   config->set_process_data_mode(
@@ -22,20 +23,33 @@ robot::comm::Comm MakeEthercatComm() {
   return comm;
 }
 
-TEST(CommFactoryTest, CreateEthercatTransportRejectsWrongCommType) {
+TEST(CommFactoryTest, CreateCommRejectsMissingTransportType) {
   robot::comm::Comm comm;
   comm.set_comm_type(robot::comm::CommType::SERIAL);
+  comm.mutable_serial_config()->set_port("/dev/ttyUSB0");
+  comm.mutable_serial_config()->set_baudrate(115200);
 
-  auto transport_or = CommFactory::CreateEthercatTransport(comm);
+  auto transport = CommFactory::CreateComm(comm);
 
-  EXPECT_EQ(transport_or.status().code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_EQ(transport.status().code(), absl::StatusCode::kInvalidArgument);
 }
 
-TEST(CommFactoryTest, CreateEthercatTransportRejectsMissingConfig) {
+TEST(CommFactoryTest, CreateCommRejectsUnsupportedMechanismCapabilityPair) {
+  robot::comm::Comm comm;
+  comm.set_comm_type(robot::comm::CommType::ETHERNET_UDP);
+  comm.set_transport_type(robot::comm::TransportType::BYTE_STREAM);
+
+  auto transport = CommFactory::CreateComm(comm);
+
+  EXPECT_EQ(transport.status().code(), absl::StatusCode::kInvalidArgument);
+}
+
+TEST(CommFactoryTest, CreateCommRejectsMissingEthercatConfig) {
   robot::comm::Comm comm;
   comm.set_comm_type(robot::comm::CommType::ETHERCAT);
+  comm.set_transport_type(robot::comm::TransportType::CYCLIC);
 
-  auto transport_or = CommFactory::CreateEthercatTransport(comm);
+  auto transport_or = CommFactory::CreateComm(comm);
 
   EXPECT_EQ(transport_or.status().code(), absl::StatusCode::kInvalidArgument);
 }
@@ -44,7 +58,7 @@ TEST(CommFactoryTest, CreateEthercatTransportRejectsMissingInterfaceName) {
   auto comm = MakeEthercatComm();
   comm.mutable_ethercat_config()->clear_interface_name();
 
-  auto transport_or = CommFactory::CreateEthercatTransport(comm);
+  auto transport_or = CommFactory::CreateEthercat(comm.ethercat_config());
 
   EXPECT_EQ(transport_or.status().code(), absl::StatusCode::kInvalidArgument);
 }
@@ -54,13 +68,14 @@ TEST(CommFactoryTest, CreateEthercatTransportRejectsInvalidProcessDataMode) {
   comm.mutable_ethercat_config()->set_process_data_mode(
       robot::comm::EthercatProcessDataMode::ETHERCAT_PROCESS_DATA_MODE_INVALID);
 
-  auto transport_or = CommFactory::CreateEthercatTransport(comm);
+  auto transport_or = CommFactory::CreateEthercat(comm.ethercat_config());
 
   EXPECT_EQ(transport_or.status().code(), absl::StatusCode::kInvalidArgument);
 }
 
 TEST(CommFactoryTest, CreateEthercatTransportReportsUnavailableForMissingInterface) {
-  auto transport_or = CommFactory::CreateEthercatTransport(MakeEthercatComm());
+  auto comm = MakeEthercatComm();
+  auto transport_or = CommFactory::CreateEthercat(comm.ethercat_config());
 
   EXPECT_EQ(transport_or.status().code(), absl::StatusCode::kUnavailable);
 }
@@ -79,8 +94,9 @@ class CommFactoryEthercatCacheTest : public ::testing::Test {
 };
 
 TEST_F(CommFactoryEthercatCacheTest, SameInterfaceSharesOneMaster) {
-  auto first_or = CommFactory::CreateEthercatTransport(MakeEthercatComm());
-  auto second_or = CommFactory::CreateEthercatTransport(MakeEthercatComm());
+  auto comm = MakeEthercatComm();
+  auto first_or = CommFactory::CreateEthercat(comm.ethercat_config());
+  auto second_or = CommFactory::CreateEthercat(comm.ethercat_config());
 
   ASSERT_TRUE(first_or.ok()) << first_or.status();
   ASSERT_TRUE(second_or.ok()) << second_or.status();
@@ -88,10 +104,11 @@ TEST_F(CommFactoryEthercatCacheTest, SameInterfaceSharesOneMaster) {
 }
 
 TEST_F(CommFactoryEthercatCacheTest, DifferentInterfacesGetDifferentMasters) {
-  auto first_or = CommFactory::CreateEthercatTransport(MakeEthercatComm());
+  auto first_comm = MakeEthercatComm();
+  auto first_or = CommFactory::CreateEthercat(first_comm.ethercat_config());
   auto other_comm = MakeEthercatComm();
   other_comm.mutable_ethercat_config()->set_interface_name("joshua-no-such-ethercat-iface1");
-  auto second_or = CommFactory::CreateEthercatTransport(other_comm);
+  auto second_or = CommFactory::CreateEthercat(other_comm.ethercat_config());
 
   ASSERT_TRUE(first_or.ok()) << first_or.status();
   ASSERT_TRUE(second_or.ok()) << second_or.status();
@@ -99,13 +116,14 @@ TEST_F(CommFactoryEthercatCacheTest, DifferentInterfacesGetDifferentMasters) {
 }
 
 TEST_F(CommFactoryEthercatCacheTest, RejectsProcessDataModeChangeOnOpenInterface) {
-  auto first_or = CommFactory::CreateEthercatTransport(MakeEthercatComm());
+  auto first_comm = MakeEthercatComm();
+  auto first_or = CommFactory::CreateEthercat(first_comm.ethercat_config());
   ASSERT_TRUE(first_or.ok()) << first_or.status();
 
   auto lrw_comm = MakeEthercatComm();
   lrw_comm.mutable_ethercat_config()->set_process_data_mode(
       robot::comm::EthercatProcessDataMode::ETHERCAT_PROCESS_DATA_MODE_LRW);
-  auto second_or = CommFactory::CreateEthercatTransport(lrw_comm);
+  auto second_or = CommFactory::CreateEthercat(lrw_comm.ethercat_config());
 
   EXPECT_EQ(second_or.status().code(), absl::StatusCode::kInvalidArgument);
 }
@@ -121,10 +139,11 @@ TEST_F(CommFactoryEthercatCacheTest, FailedInitIsNotCached) {
     return transport;
   });
 
-  auto failed_or = CommFactory::CreateEthercatTransport(MakeEthercatComm());
+  auto comm = MakeEthercatComm();
+  auto failed_or = CommFactory::CreateEthercat(comm.ethercat_config());
   EXPECT_EQ(failed_or.status().code(), absl::StatusCode::kUnavailable);
 
-  auto retry_or = CommFactory::CreateEthercatTransport(MakeEthercatComm());
+  auto retry_or = CommFactory::CreateEthercat(comm.ethercat_config());
   EXPECT_TRUE(retry_or.ok()) << retry_or.status();
   EXPECT_EQ(factory_calls, 2);
 }

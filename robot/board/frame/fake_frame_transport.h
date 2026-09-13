@@ -7,13 +7,20 @@
 
 namespace robot::board {
 
-// In-memory FrameTransport double for boards under test
-// (docs/BOARD_LAYER_RFC.md §7.3). SendAndReceive pops queued responses in
-// FIFO order regardless of the request frame sent; queue the expected
-// response before triggering the call under test — mirrors
-// robot::comm::FakeSerialTransport.
+// In-memory message transport for board tests.
 class FakeFrameTransport : public FrameTransport {
  public:
+  absl::Status Open() override {
+    return absl::OkStatus();
+  }
+
+  absl::Status Write(const std::vector<uint8_t>& message) override {
+    send_calls_++;
+    last_sent_ = message;
+    sent_.push_back(message);
+    return send_status_;
+  }
+
   absl::StatusOr<std::vector<uint8_t>> SendAndReceive(const std::vector<uint8_t>& request_frame,
                                                       size_t expected_response_len) override {
     send_calls_++;
