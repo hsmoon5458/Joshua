@@ -17,21 +17,6 @@
 
 namespace {
 
-// The display name, whichever shape the entry uses.
-std::string DisplayName(const robot::perception::SinglePerception& single_perception) {
-  return single_perception.has_sensor() ? single_perception.sensor().sensor_name()
-                                        : single_perception.lidar().lidar_name();
-}
-
-// True for either shape while presets migrate: the new Sensor message
-// names the reading's meaning, the old one named a device family.
-bool Matches(const robot::perception::SinglePerception& single_perception) {
-  if (single_perception.has_sensor()) {
-    return single_perception.sensor().sensor_type() == robot::perception::SensorType::RANGE_SCAN;
-  }
-  return single_perception.perception_type() == robot::perception::PerceptionType::LIDAR;
-}
-
 bool ValidateLidarPublisher(const ros2::data_type::Ros2DataType ros2_data_type) {
   return ros2_data_type == ros2::data_type::POINTCLOUD2;
 }
@@ -52,12 +37,12 @@ class LidarPublisher : public rclcpp::Node {
   LidarPublisher(const std::string& node_name, const int node_id, const config::Config& config)
       : Node(node_name) {
     for (const auto& single_perception : config.robot().perceptions().single_perceptions()) {
-      if (!Matches(single_perception) ||
+      if (single_perception.sensor().sensor_type() != robot::perception::SensorType::RANGE_SCAN ||
           static_cast<int>(single_perception.node().id()) != node_id) {
         continue;
       }
 
-      const std::string sensor_name = DisplayName(single_perception);
+      const auto& sensor_proto = single_perception.sensor();
       const auto& qos_setting = single_perception.node().qos_setting();
 
       auto interface = robot::perception::PerceptionFactory::CreatePerception(
@@ -65,7 +50,7 @@ class LidarPublisher : public rclcpp::Node {
       if (!interface.ok()) {
         RCLCPP_ERROR(this->get_logger(),
                      "Failed to create perception interface for lidar '%s': %s",
-                     sensor_name.c_str(),
+                     sensor_proto.sensor_name().c_str(),
                      std::string(interface.status().message()).c_str());
         continue;
       }
@@ -92,12 +77,13 @@ class LidarPublisher : public rclcpp::Node {
                   .timer = this->create_wall_timer(
                       std::chrono::milliseconds(1000 / publisher.publish_rate_hz()),
                       [this]() { publish_lidar_data(); }),
-                  .frame_id = sensor_name.empty() ? "lidar_frame" : sensor_name});
+                  .frame_id = sensor_proto.sensor_name().empty() ? "lidar_frame"
+                                                                 : sensor_proto.sensor_name()});
       }
 
       RCLCPP_INFO(this->get_logger(),
                   "Found lidar '%s' in configuration for node_id %d. Publishing on %zu topics",
-                  sensor_name.c_str(),
+                  sensor_proto.sensor_name().c_str(),
                   node_id,
                   single_perception.node().publishers().size());
     }

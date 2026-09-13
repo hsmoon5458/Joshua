@@ -1,14 +1,10 @@
 #pragma once
 
-#include <memory>
-#include <string>
-
-#include "config/proto/robot.pb.h"
 #include "robot/perception/interfaces/perception_interface.h"
 
-// Abstract camera interface.
 namespace robot::perception {
 
+// Common interface for sensors that publish images.
 class CameraInterface : public PerceptionInterface {
  public:
   ~CameraInterface() override = default;

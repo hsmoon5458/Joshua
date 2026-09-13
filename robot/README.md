@@ -18,37 +18,46 @@ comm/         how bytes move  serial, EtherCAT — transport only
 perception/   what senses     cameras, encoders, lidar
 ```
 
-`board/` is **mid-migration — read this before touching the actuator path.**
 Each layer talks to the one below through an interface, never a concrete type:
 a motor driver holds a `BoardChannel`, not a `Serial`, so a motor, a controller
 board, and a transport can be chosen independently in config rather than in
 code.
 
 The actuator path is there: every `MotorType` `ActionFactory` supports resolves
-`board_name` → `BoardFactory` → `OpenChannel` → driver. Perception has not
-migrated — it is still driver-direct (Phase 6). Check
-[docs/BOARD_LAYER_RFC.md](../docs/BOARD_LAYER_RFC.md) §10 for which phase has
-landed before assuming either way.
+`board_name` → `BoardFactory` → `OpenChannel` → driver, over the shared lookup
+in `board/factory/board_resolver.h`.
 
-**There is no Python in this directory, and none should be added.** The Python
-robot layer (factories, interfaces, mock drivers) was deleted in RFC §10
-Phase 9, and the Pybricks bench driver moved to
-[tools/pybricks/](../tools/README.md) as off-runtime-path tooling.
-Hardware-facing ROS 2 nodes are C++ only, and `node_generator` no longer
-selects between backends.
+Perception resolves the same way, and a sensor reaches hardware through one of
+two configured paths:
+
+- **Board leg.** The device multiplexes several channels over one link (a
+  Feetech servo bus, an MCU, an EtherCAT slave), so it needs channel
+  addressing and bus arbitration: it *is* a board. The sensor names one and
+  opens a channel on it, so a sensor and an actuator on one bus share a board
+  instance and its bus mutex.
+- **Device leg.** The device multiplexes nothing (a camera, a scanning lidar).
+  There is no channel to address and no bus to share, so it owns its own
+  handle — a `robot::comm::ByteStream` for anything that consumes ordered bytes,
+  which keeps the comm axis a config choice.
+
+Sensors are named for what they measure, independently of how they are wired.
+
+Hardware-facing runtime code in this directory is C++.
 
 ## Responsibilities
 
 - `action/` — motor drivers (`motors/drivers/`), the actuator interfaces, and
   `factory/`, which resolves a config actuator to a driver.
-- `board/` — `interfaces/` (`BoardChannel`, `BoardInterface`), `factory/` with
-  its per-board instance cache and motor/channel compatibility validation,
+- `board/` — `interfaces/` (`BoardChannel`, `BoardInterface`), and `factory/`
+  with its per-board instance cache, the shared channel resolver, and the
+  motor/drive and sensor/signal compatibility tables,
   `proto/`, and `mock/`. `mock/` is C++ test infrastructure: it lets the
   factory and board tests exercise real drivers with no hardware attached.
-- `comm/` — `serial/` and `ethercat/` transports plus `factory/`. Transports
-  move bytes and know nothing about motors.
-- `perception/` — camera, encoder, and lidar drivers behind
-  `perception/interfaces/`.
+- `comm/` — transport capability interfaces, concrete communication
+  mechanisms, and their factories. See [comm/README.md](comm/README.md).
+- `perception/` — sensor drivers behind `PerceptionInterface`: `position/`
+  for board-attached position sensors, `camera/` and `lidar/` for device
+  sensors, and `factory/`, which resolves the configured acquisition path.
 
 ## Non-Goals
 

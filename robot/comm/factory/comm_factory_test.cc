@@ -54,7 +54,7 @@ TEST(CommFactoryTest, CreateCommRejectsMissingEthercatConfig) {
   EXPECT_EQ(transport_or.status().code(), absl::StatusCode::kInvalidArgument);
 }
 
-TEST(CommFactoryTest, CreateEthercatTransportRejectsMissingInterfaceName) {
+TEST(CommFactoryTest, CreateEthercatRejectsMissingInterfaceName) {
   auto comm = MakeEthercatComm();
   comm.mutable_ethercat_config()->clear_interface_name();
 
@@ -63,7 +63,7 @@ TEST(CommFactoryTest, CreateEthercatTransportRejectsMissingInterfaceName) {
   EXPECT_EQ(transport_or.status().code(), absl::StatusCode::kInvalidArgument);
 }
 
-TEST(CommFactoryTest, CreateEthercatTransportRejectsInvalidProcessDataMode) {
+TEST(CommFactoryTest, CreateEthercatRejectsInvalidProcessDataMode) {
   auto comm = MakeEthercatComm();
   comm.mutable_ethercat_config()->set_process_data_mode(
       robot::comm::EthercatProcessDataMode::ETHERCAT_PROCESS_DATA_MODE_INVALID);
@@ -73,7 +73,7 @@ TEST(CommFactoryTest, CreateEthercatTransportRejectsInvalidProcessDataMode) {
   EXPECT_EQ(transport_or.status().code(), absl::StatusCode::kInvalidArgument);
 }
 
-TEST(CommFactoryTest, CreateEthercatTransportReportsUnavailableForMissingInterface) {
+TEST(CommFactoryTest, CreateEthercatReportsUnavailableForMissingInterface) {
   auto comm = MakeEthercatComm();
   auto transport_or = CommFactory::CreateEthercat(comm.ethercat_config());
 
