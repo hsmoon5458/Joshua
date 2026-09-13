@@ -16,6 +16,22 @@
 
 namespace {
 
+// The display name, whichever shape the entry uses.
+std::string DisplayName(const robot::perception::SinglePerception& single_perception) {
+  return single_perception.has_sensor() ? single_perception.sensor().sensor_name()
+                                        : single_perception.encoder().encoder_name();
+}
+
+// True for either shape while presets migrate: the new Sensor message
+// names the reading's meaning, the old one named a device family.
+bool Matches(const robot::perception::SinglePerception& single_perception) {
+  if (single_perception.has_sensor()) {
+    return single_perception.sensor().sensor_type() ==
+           robot::perception::SensorType::JOINT_POSITION;
+  }
+  return single_perception.perception_type() == robot::perception::PerceptionType::ENCODER;
+}
+
 bool ValidateEncoderPublisher(const ros2::data_type::Ros2DataType ros2_data_type) {
   return ros2_data_type == ros2::data_type::FLOAT32;
 }
@@ -35,20 +51,21 @@ class EncoderPublisher : public rclcpp::Node {
   EncoderPublisher(const std::string& node_name, const int node_id, const config::Config& config)
       : Node(node_name) {
     for (const auto& single_perception : config.robot().perceptions().single_perceptions()) {
-      if (single_perception.perception_type() != robot::perception::PerceptionType::ENCODER ||
+      if (!Matches(single_perception) ||
           static_cast<int>(single_perception.node().id()) != node_id) {
         continue;
       }
 
-      const auto& encoder_proto = single_perception.encoder();
+      const std::string sensor_name = DisplayName(single_perception);
       const auto& qos_setting = single_perception.node().qos_setting();
 
-      auto interface = robot::perception::PerceptionFactory::CreatePerception(single_perception);
+      auto interface = robot::perception::PerceptionFactory::CreatePerception(
+          single_perception, config.robot().boards());
       if (!interface.ok()) {
         RCLCPP_ERROR(this->get_logger(),
                      "Failed to create perception interface for encoder '%s'. Check hardware "
                      "connection or permissions.",
-                     encoder_proto.encoder_name().c_str());
+                     sensor_name.c_str());
         continue;
       }
 
@@ -77,7 +94,7 @@ class EncoderPublisher : public rclcpp::Node {
 
       RCLCPP_INFO(this->get_logger(),
                   "Found encoder '%s' in configuration for node_id %d. Publishing on %zu topics.",
-                  encoder_proto.encoder_name().c_str(),
+                  sensor_name.c_str(),
                   node_id,
                   single_perception.node().publishers().size());
     }
