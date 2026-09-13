@@ -6,6 +6,21 @@ general{
 }
 
 robot {
+  boards {
+    name: "arm_bus"
+    board_type: FEETECH_BUS
+    comm {
+      comm_type: SERIAL
+      transport_type: MESSAGE
+      serial_config { port: "/dev/ttyACM1" baudrate: 1000000 }
+    }
+    channels { index: 1 drive: SERVO_BUS_UART signal: SERVO_BUS_REGISTER servo_bus { servo_id: 1 } }
+    channels { index: 2 drive: SERVO_BUS_UART signal: SERVO_BUS_REGISTER servo_bus { servo_id: 2 } }
+    channels { index: 3 drive: SERVO_BUS_UART signal: SERVO_BUS_REGISTER servo_bus { servo_id: 3 } }
+    channels { index: 4 drive: SERVO_BUS_UART signal: SERVO_BUS_REGISTER servo_bus { servo_id: 4 } }
+    channels { index: 5 drive: SERVO_BUS_UART signal: SERVO_BUS_REGISTER servo_bus { servo_id: 5 } }
+    channels { index: 6 drive: SERVO_BUS_UART signal: SERVO_BUS_REGISTER servo_bus { servo_id: 6 } }
+  }
   perceptions {
     single_perceptions {
       node {
@@ -43,25 +58,14 @@ robot {
           publish_rate_hz: 30
         }
       }
-      perception_type: ENCODER
-      encoder {
-        encoder_name: "sts3215_encoder_1"
+      sensor {
+        sensor_name: "sts3215_encoder_1"
         id: 1
-        encoder_type: STS3215_ENCODER
-        comm {
-          comm_type: SERIAL
-          transport_type: MESSAGE
-          serial_config {
-            id: 1
-            port: "/dev/ttyACM1"
-            baudrate: 1000000
-          }
-        }
+        sensor_type: JOINT_POSITION
         operational_lower_limit: 1147
         operational_upper_limit: 3154
-        sts3215_encoder_config {
-          servo_id: 1
-        }
+        board_name: "arm_bus"
+        channel: 1
       }
     }
     single_perceptions {
@@ -75,25 +79,14 @@ robot {
           publish_rate_hz: 30
         }
       }
-      perception_type: ENCODER
-      encoder {
-        encoder_name: "sts3215_encoder_2"
+      sensor {
+        sensor_name: "sts3215_encoder_2"
         id: 2
-        encoder_type: STS3215_ENCODER
-        comm {
-          comm_type: SERIAL
-          transport_type: MESSAGE
-          serial_config {
-            id: 2
-            port: "/dev/ttyACM1"
-            baudrate: 1000000
-          }
-        }
+        sensor_type: JOINT_POSITION
         operational_lower_limit: 1670
         operational_upper_limit: 3986
-        sts3215_encoder_config {
-          servo_id: 2
-        }
+        board_name: "arm_bus"
+        channel: 2
       }
     }
     single_perceptions {
@@ -107,25 +100,14 @@ robot {
           publish_rate_hz: 30
         }
       }
-      perception_type: ENCODER
-      encoder {
-        encoder_name: "sts3215_encoder_3"
+      sensor {
+        sensor_name: "sts3215_encoder_3"
         id: 3
-        encoder_type: STS3215_ENCODER
-        comm {
-          comm_type: SERIAL
-          transport_type: MESSAGE
-          serial_config {
-            id: 3
-            port: "/dev/ttyACM1"
-            baudrate: 1000000
-          }
-        }
+        sensor_type: JOINT_POSITION
         operational_lower_limit: 910
         operational_upper_limit: 3113
-        sts3215_encoder_config {
-          servo_id: 3
-        }
+        board_name: "arm_bus"
+        channel: 3
       }
     }
     single_perceptions {
@@ -139,25 +121,14 @@ robot {
           publish_rate_hz: 30
         }
       }
-      perception_type: ENCODER
-      encoder {
-        encoder_name: "sts3215_encoder_4"
+      sensor {
+        sensor_name: "sts3215_encoder_4"
         id: 4
-        encoder_type: STS3215_ENCODER
-        comm {
-          comm_type: SERIAL
-          transport_type: MESSAGE
-          serial_config {
-            id: 4
-            port: "/dev/ttyACM1"
-            baudrate: 1000000
-          }
-        }
+        sensor_type: JOINT_POSITION
         operational_lower_limit: 0
         operational_upper_limit: 2407
-        sts3215_encoder_config {
-          servo_id: 4
-        }
+        board_name: "arm_bus"
+        channel: 4
       }
     }
     single_perceptions {
@@ -171,25 +142,14 @@ robot {
           publish_rate_hz: 30
         }
       }
-      perception_type: ENCODER
-      encoder {
-        encoder_name: "sts3215_encoder_5"
+      sensor {
+        sensor_name: "sts3215_encoder_5"
         id: 5
-        encoder_type: STS3215_ENCODER
-        comm {
-          comm_type: SERIAL
-          transport_type: MESSAGE
-          serial_config {
-            id: 5
-            port: "/dev/ttyACM1"
-            baudrate: 1000000
-          }
-        }
+        sensor_type: JOINT_POSITION
         operational_lower_limit: 1730
         operational_upper_limit: 3811
-        sts3215_encoder_config {
-          servo_id: 5
-        }
+        board_name: "arm_bus"
+        channel: 5
       }
     }
     single_perceptions {
@@ -203,25 +163,14 @@ robot {
           publish_rate_hz: 30
         }
       }
-      perception_type: ENCODER
-      encoder {
-        encoder_name: "sts3215_encoder_6"
+      sensor {
+        sensor_name: "sts3215_encoder_6"
         id: 6
-        encoder_type: STS3215_ENCODER
-        comm {
-          comm_type: SERIAL
-          transport_type: MESSAGE
-          serial_config {
-            id: 6
-            port: "/dev/ttyACM1"
-            baudrate: 1000000
-          }
-        }
+        sensor_type: JOINT_POSITION
         operational_lower_limit: 2028
         operational_upper_limit: 3100
-        sts3215_encoder_config {
-          servo_id: 6
-        }
+        board_name: "arm_bus"
+        channel: 6
       }
     }
   }
