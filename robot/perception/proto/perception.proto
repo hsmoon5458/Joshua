@@ -5,6 +5,17 @@ import "ros2/proto/node.proto";
 
 package robot.perception;
 
+// Describes what a sensor measures, independently of its hardware and
+// communication mechanism.
+enum SensorType {
+  SENSOR_INVALID = 0;
+  POSITION = 1;  // Linear or rotary position, in the channel's native unit.
+  IMAGE = 2;
+  RANGE_SCAN = 3;
+  IMU_6DOF = 4;
+  FORCE_TORQUE = 5;
+}
+
 enum PerceptionType {
   PERCEPTION_INVALID = 0;
   CAMERA = 1;
@@ -75,14 +86,42 @@ message Sts3215EncoderConfig {
   uint64 servo_id = 1;
 }
 
+// The message presence selects the LDS-01 driver.
+message Lds01Config {}
+
+// A sensor uses either a board channel or its own communication mechanism.
+message Sensor {
+  string sensor_name = 1;
+  uint64 id = 2;
+  SensorType sensor_type = 3;
+
+  // Board-attached acquisition path.
+  string board_name = 4;
+  uint32 channel = 5;
+
+  // Device leg. Mutually exclusive with the board leg.
+  robot.comm.Comm comm = 6;
+
+  float operational_lower_limit = 7;
+  float operational_upper_limit = 8;
+
+  // Device-specific acquisition path.
+  oneof sensor_config {
+    OpenCvConfig opencv_config = 10;
+    Lds01Config lds01_config = 11;
+  }
+}
+
 message SinglePerception {
   ros2.node.Node node = 1;
+  // Deprecated device-family discriminator.
   PerceptionType perception_type = 2;
   oneof perception_data {
     Camera camera = 3;
     Encoder encoder = 4;
     Lidar lidar = 5;
   }
+  Sensor sensor = 6;
 }
 
 message Perception {
