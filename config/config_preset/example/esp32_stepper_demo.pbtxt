@@ -35,6 +35,7 @@ robot {
     board_type: ESP32
     comm {
       comm_type: SERIAL
+      transport_type: MESSAGE
       # Most ESP32 dev boards enumerate through a USB-to-UART bridge chip
       # (CP2102/CH340/...), not native USB CDC like Teensy 4.1 — check
       # `ls /dev/ttyUSB*` (or /dev/ttyACM* if your board does have native

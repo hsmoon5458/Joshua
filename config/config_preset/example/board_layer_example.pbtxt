@@ -16,6 +16,7 @@ robot {
     board_type: ARDUINO_UNO
     comm {
       comm_type: ETHERNET_UDP
+      transport_type: MESSAGE
       udp_config { host: "192.168.1.50" port: 5555 }
     }
     channels {
@@ -35,6 +36,7 @@ robot {
     board_type: FEETECH_BUS
     comm {
       comm_type: SERIAL
+      transport_type: MESSAGE
       serial_config { port: "/dev/ttyUSB0" baudrate: 1000000 }
     }
     channels {

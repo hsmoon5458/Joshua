@@ -25,6 +25,7 @@ general{
           lidar_type: LDS01
           comm {
             comm_type: SERIAL
+            transport_type: BYTE_STREAM
             serial_config {
               id: 1
               port: "/dev/ttyUSB0"

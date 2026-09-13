@@ -26,8 +26,7 @@ namespace {
 
 class Am243DemoChannel : public BoardChannel {
  public:
-  explicit Am243DemoChannel(std::shared_ptr<Am243SharedState> state)
-      : state_(std::move(state)) {}
+  explicit Am243DemoChannel(std::shared_ptr<Am243SharedState> state) : state_(std::move(state)) {}
 
   absl::Status Enable() override {
     return absl::OkStatus();
@@ -69,6 +68,10 @@ absl::Status ValidateEthercatConfig(const robot::board::Board& config) {
   if (!config.comm().has_ethercat_config()) {
     return absl::InvalidArgumentError(
         absl::StrCat("AM243 board '", config.name(), "' has no EtherCAT comm config."));
+  }
+  if (config.comm().transport_type() != robot::comm::TransportType::CYCLIC) {
+    return absl::InvalidArgumentError(
+        absl::StrCat("AM243 board '", config.name(), "' requires CYCLIC transport."));
   }
   if (config.comm().ethercat_config().process_data_mode() !=
       robot::comm::EthercatProcessDataMode::ETHERCAT_PROCESS_DATA_MODE_SPLIT_LRD_LWR) {
@@ -120,14 +123,16 @@ absl::Status Am243Board::Init(const robot::board::Board& config) {
   }
 
   if (config.comm().comm_type() != robot::comm::CommType::ETHERCAT) {
-    return absl::InvalidArgumentError(absl::StrCat(
-        "AM243 board '", config.name(), "' requires SERIAL or ETHERCAT comm config."));
+    return absl::InvalidArgumentError(
+        absl::StrCat("AM243 board '", config.name(), "' requires SERIAL or ETHERCAT comm config."));
   }
   ABSL_RETURN_IF_ERROR(ValidateEthercatConfig(config));
 
   auto state = std::make_shared<Am243SharedState>();
-  ABSL_ASSIGN_OR_RETURN(state->transport,
-                        robot::comm::CommFactory::CreateEthercatTransport(config.comm()));
+  ABSL_ASSIGN_OR_RETURN(auto comm, robot::comm::CommFactory::CreateComm(config.comm()));
+  ABSL_ASSIGN_OR_RETURN(
+      state->transport,
+      robot::comm::GetCommTransport<robot::comm::ethercat::EthercatTransport>(comm));
   ABSL_RETURN_IF_ERROR(state->transport->ConfigureSlaves());
   ABSL_RETURN_IF_ERROR(state->transport->StartCyclic());
 

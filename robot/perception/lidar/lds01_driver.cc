@@ -4,23 +4,24 @@
 
 #include <chrono>
 #include <cmath>
+#include <utility>
 
 #include "utils/status_macros.h"
 
 namespace robot::perception {
 
-Lds01Driver::Lds01Driver(const std::shared_ptr<robot::comm::Serial>& serial,
+Lds01Driver::Lds01Driver(std::shared_ptr<robot::comm::ByteStream> stream,
                          const robot::perception::Lidar& lidar_config)
-    : serial_(serial) {
+    : stream_(std::move(stream)) {
   id_ = std::to_string(lidar_config.id());
 }
 
 absl::Status Lds01Driver::Init() {
-  ABSL_RETURN_IF_ERROR(serial_->Open());
+  ABSL_RETURN_IF_ERROR(stream_->Open());
 
   // Send start motor command (required for LDS-01)
   std::vector<uint8_t> start_cmd = {'b'};
-  ABSL_RETURN_IF_ERROR(serial_->Write(start_cmd));
+  ABSL_RETURN_IF_ERROR(stream_->Write(start_cmd));
 
   stop_receiving_.store(false);
   return absl::OkStatus();
@@ -31,7 +32,7 @@ absl::Status Lds01Driver::Teardown() {
 
   // Send stop motor command
   std::vector<uint8_t> stop_cmd = {'e'};
-  ABSL_RETURN_IF_ERROR(serial_->Write(stop_cmd));
+  ABSL_RETURN_IF_ERROR(stream_->Write(stop_cmd));
 
   return absl::OkStatus();
 }
@@ -55,7 +56,7 @@ absl::StatusOr<robot::perception::PerceptionPacket> Lds01Driver::GetData() {
   // Main loop for thread.
   while (!stop_receiving_.load(std::memory_order_acquire) && !got_scan) {
     // Wait until first data sync of frame: 0xFA, 0xA0
-    ABSL_ASSIGN_OR_RETURN(auto result, serial_->Read(1));
+    ABSL_ASSIGN_OR_RETURN(auto result, stream_->Read(1));
 
     uint8_t byte = result[0];
 
@@ -69,7 +70,7 @@ absl::StatusOr<robot::perception::PerceptionPacket> Lds01Driver::GetData() {
         // Start sequence found, read in the rest of the message via a single blocking read
         LOG(INFO) << "Found start sequence, reading full scan...";
 
-        ABSL_ASSIGN_OR_RETURN(auto remain_result, serial_->Read(2518));
+        ABSL_ASSIGN_OR_RETURN(auto remain_result, stream_->Read(2518));
 
         // Reconstruct the full packet: 0xFA, 0xA0 + remaining data
         raw_bytes[0] = 0xFA;

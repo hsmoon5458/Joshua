@@ -17,28 +17,23 @@
 namespace robot::board {
 
 struct FeetechBusSharedState {
-  std::shared_ptr<robot::comm::SerialTransport> transport;
-  // Serializes bus access: one request/response in flight on the
-  // half-duplex UART at a time (docs/BOARD_LAYER_RFC.md §5.6).
+  std::shared_ptr<robot::comm::MessageTransport> transport;
+  // Allows one request/response exchange at a time on the half-duplex bus.
   std::mutex bus_mutex;
 };
 
 namespace {
 
 std::function<
-    absl::StatusOr<std::shared_ptr<robot::comm::SerialTransport>>(const robot::comm::Comm&)>&
+    absl::StatusOr<std::shared_ptr<robot::comm::MessageTransport>>(const robot::comm::Comm&)>&
 SerialTransportFactoryForTesting() {
-  static std::function<absl::StatusOr<std::shared_ptr<robot::comm::SerialTransport>>(
+  static std::function<absl::StatusOr<std::shared_ptr<robot::comm::MessageTransport>>(
       const robot::comm::Comm&)>
       factory;
   return factory;
 }
 
-// One SERVO_BUS_UART channel: a single servo_id on a shared Feetech bus. The
-// register-protocol encoding lives in feetech_protocol.h; this class only
-// owns the channel's servo_id, its fixed move-time tunable, and the speed
-// staged by the most recent kVelocity target (mirrors the pre-board-layer
-// Sts3215Driver's SetSpeed, which also only updated local state).
+// One addressable channel on a shared servo bus.
 class FeetechBusChannel : public BoardChannel {
  public:
   FeetechBusChannel(std::shared_ptr<FeetechBusSharedState> state,
@@ -77,9 +72,7 @@ class FeetechBusChannel : public BoardChannel {
         return state_->transport->Write(packet);
       }
       case TargetMode::kTorque:
-        // STS3215 has a torque-enable register, not a continuous torque
-        // target; use Enable/Disable for gating (docs/BOARD_LAYER_RFC.md
-        // §12.7, resolved in board_channel.h).
+        // This bus exposes torque enable, but no continuous torque target.
         return absl::UnimplementedError(
             "FEETECH_BUS channel has no continuous torque target; use Enable/Disable.");
     }
@@ -93,7 +86,7 @@ class FeetechBusChannel : public BoardChannel {
       std::lock_guard<std::mutex> lock(state_->bus_mutex);
       ABSL_ASSIGN_OR_RETURN(
           response,
-          state_->transport->AtomicRead(request, feetech::kStatusPacketOverheadBytes + 2));
+          state_->transport->SendAndReceive(request, feetech::kStatusPacketOverheadBytes + 2));
     }
     ABSL_ASSIGN_OR_RETURN(auto params, feetech::ParseStatusPacket(response, servo_id_));
     if (params.size() != 2) {
@@ -137,6 +130,10 @@ absl::Status ValidateConfig(const robot::board::Board& config) {
     return absl::InvalidArgumentError(
         absl::StrCat("FEETECH_BUS board '", config.name(), "' requires SERIAL comm config."));
   }
+  if (config.comm().transport_type() != robot::comm::TransportType::MESSAGE) {
+    return absl::InvalidArgumentError(
+        absl::StrCat("FEETECH_BUS board '", config.name(), "' requires MESSAGE transport."));
+  }
   if (config.channels_size() == 0) {
     return absl::InvalidArgumentError(
         absl::StrCat("FEETECH_BUS board '", config.name(), "' declares no channels."));
@@ -168,11 +165,7 @@ absl::Status ValidateConfig(const robot::board::Board& config) {
   return absl::OkStatus();
 }
 
-// PING + read model-number register: the FEETECH_BUS IDENTIFY handshake
-// (docs/BOARD_LAYER_RFC.md §5.6). The model number itself is not compared
-// against an expected value (no verified reference on this branch); a
-// response that fails to parse means the servo did not answer at all, which
-// is what this handshake exists to catch.
+// Verifies that the configured servo responds and exposes its model register.
 absl::Status IdentifyServo(FeetechBusSharedState& state,
                            const std::string& board_name,
                            uint8_t servo_id) {
@@ -180,22 +173,21 @@ absl::Status IdentifyServo(FeetechBusSharedState& state,
 
   const auto ping = feetech::BuildPingPacket(servo_id);
   ABSL_ASSIGN_OR_RETURN(auto ping_response,
-                        state.transport->AtomicRead(ping, feetech::kStatusPacketOverheadBytes));
+                        state.transport->SendAndReceive(ping, feetech::kStatusPacketOverheadBytes));
   auto ping_status = feetech::ParseStatusPacket(ping_response, servo_id);
   if (!ping_status.ok()) {
     return absl::UnavailableError(absl::StrCat("Board '",
                                                board_name,
                                                "': no response from servo ",
                                                static_cast<int>(servo_id),
-                                               " on the Feetech bus; check wiring/servo ID "
-                                               "(docs/BOARD_LAYER_RFC.md §5.6). ",
+                                               " on the Feetech bus; check wiring/servo ID. ",
                                                ping_status.status().message()));
   }
 
   const auto read_model = feetech::BuildReadPacket(servo_id, feetech::kRegModelNumber, 2);
   ABSL_ASSIGN_OR_RETURN(
       auto model_response,
-      state.transport->AtomicRead(read_model, feetech::kStatusPacketOverheadBytes + 2));
+      state.transport->SendAndReceive(read_model, feetech::kStatusPacketOverheadBytes + 2));
   ABSL_RETURN_IF_ERROR(feetech::ParseStatusPacket(model_response, servo_id).status());
   return absl::OkStatus();
 }
@@ -213,8 +205,9 @@ absl::Status FeetechBusBoard::Init(const robot::board::Board& config) {
   if (SerialTransportFactoryForTesting()) {
     ABSL_ASSIGN_OR_RETURN(state->transport, SerialTransportFactoryForTesting()(config.comm()));
   } else {
-    ABSL_ASSIGN_OR_RETURN(auto serial, robot::comm::CommFactory::CreateSerial(config.comm()));
-    state->transport = serial;
+    ABSL_ASSIGN_OR_RETURN(auto comm, robot::comm::CommFactory::CreateComm(config.comm()));
+    ABSL_ASSIGN_OR_RETURN(state->transport,
+                          robot::comm::GetCommTransport<robot::comm::MessageTransport>(comm));
   }
 
   std::map<uint32_t, std::shared_ptr<BoardChannel>> channels;
@@ -262,7 +255,7 @@ absl::Status FeetechBusBoard::Teardown() {
 }
 
 void FeetechBusBoard::SetSerialTransportFactoryForTesting(
-    std::function<absl::StatusOr<std::shared_ptr<robot::comm::SerialTransport>>(
+    std::function<absl::StatusOr<std::shared_ptr<robot::comm::MessageTransport>>(
         const robot::comm::Comm&)> factory) {
   SerialTransportFactoryForTesting() = std::move(factory);
 }

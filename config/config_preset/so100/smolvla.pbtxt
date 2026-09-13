@@ -10,6 +10,7 @@ robot {
     board_type: FEETECH_BUS
     comm {
       comm_type: SERIAL
+      transport_type: MESSAGE
       serial_config { port: "/dev/ttyACM0" baudrate: 1000000 }
     }
     channels { index: 1 drive: SERVO_BUS_UART servo_bus { servo_id: 1 } }
@@ -412,4 +413,3 @@ ai {
     }
   }
 }
-

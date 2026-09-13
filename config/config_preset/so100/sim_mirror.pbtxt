@@ -24,6 +24,7 @@ robot {
         encoder_type: STS3215_ENCODER
         comm {
           comm_type: SERIAL
+          transport_type: MESSAGE
           serial_config {
             id: 1
             port: "/dev/ttyACM1"
@@ -55,6 +56,7 @@ robot {
         encoder_type: STS3215_ENCODER
         comm {
           comm_type: SERIAL
+          transport_type: MESSAGE
           serial_config {
             id: 2
             port: "/dev/ttyACM1"
@@ -86,6 +88,7 @@ robot {
         encoder_type: STS3215_ENCODER
         comm {
           comm_type: SERIAL
+          transport_type: MESSAGE
           serial_config {
             id: 3
             port: "/dev/ttyACM1"
@@ -117,6 +120,7 @@ robot {
         encoder_type: STS3215_ENCODER
         comm {
           comm_type: SERIAL
+          transport_type: MESSAGE
           serial_config {
             id: 4
             port: "/dev/ttyACM1"
@@ -148,6 +152,7 @@ robot {
         encoder_type: STS3215_ENCODER
         comm {
           comm_type: SERIAL
+          transport_type: MESSAGE
           serial_config {
             id: 5
             port: "/dev/ttyACM1"
@@ -179,6 +184,7 @@ robot {
         encoder_type: STS3215_ENCODER
         comm {
           comm_type: SERIAL
+          transport_type: MESSAGE
           serial_config {
             id: 6
             port: "/dev/ttyACM1"

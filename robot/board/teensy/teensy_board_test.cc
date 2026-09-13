@@ -43,6 +43,7 @@ robot::board::Board MakeTeensyBoard() {
   board.set_board_type(robot::board::BoardType::TEENSY41);
   auto* comm = board.mutable_comm();
   comm->set_comm_type(robot::comm::CommType::SERIAL);
+  comm->set_transport_type(robot::comm::TransportType::MESSAGE);
   comm->mutable_serial_config()->set_port("/dev/ttyACM0");
   comm->mutable_serial_config()->set_baudrate(115200);
   board.mutable_firmware()->set_min_proto_version(1);

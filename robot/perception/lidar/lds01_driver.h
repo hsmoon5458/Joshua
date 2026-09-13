@@ -2,19 +2,22 @@
 #include <glog/logging.h>
 
 #include <atomic>
+#include <memory>
+#include <string>
 #include <thread>
+#include <utility>
 #include <vector>
 
 #include "config/proto/robot.pb.h"
-#include "robot/comm/serial/serial.h"
+#include "robot/comm/interfaces/byte_stream.h"
 #include "robot/perception/interfaces/lidar_interface.h"
 #include "robot/perception/proto/perception_packet.pb.h"
 
 namespace robot::perception {
 class Lds01Driver : public LidarInterface {
  public:
-  explicit Lds01Driver(const std::shared_ptr<robot::comm::Serial>& serial,
-                       const robot::perception::Lidar& lidar_config);
+  Lds01Driver(std::shared_ptr<robot::comm::ByteStream> stream,
+              const robot::perception::Lidar& lidar_config);
   ~Lds01Driver() = default;
 
   absl::Status Init() override;
@@ -25,7 +28,7 @@ class Lds01Driver : public LidarInterface {
  private:
   void reading_thread_func();
 
-  std::shared_ptr<robot::comm::Serial> serial_;
+  std::shared_ptr<robot::comm::ByteStream> stream_;
   std::string id_;
   mutable robot::perception::PerceptionPacket reusable_packet_;
   std::thread receiving_thread_;

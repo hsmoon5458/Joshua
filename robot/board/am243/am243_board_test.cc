@@ -40,6 +40,7 @@ robot::board::Board MakeAm243Board() {
   board.set_board_type(robot::board::BoardType::AM243);
   auto* comm = board.mutable_comm();
   comm->set_comm_type(robot::comm::CommType::SERIAL);
+  comm->set_transport_type(robot::comm::TransportType::MESSAGE);
   comm->mutable_serial_config()->set_port("/dev/ttyACM0");
   comm->mutable_serial_config()->set_baudrate(115200);
   board.mutable_firmware()->set_min_proto_version(1);
@@ -61,6 +62,7 @@ robot::board::Board MakeAm243EthercatBoard() {
   board.set_board_type(robot::board::BoardType::AM243);
   auto* comm = board.mutable_comm();
   comm->set_comm_type(robot::comm::CommType::ETHERCAT);
+  comm->set_transport_type(robot::comm::TransportType::CYCLIC);
   comm->mutable_ethercat_config()->set_interface_name("fake-am243-iface0");
   comm->mutable_ethercat_config()->set_process_data_mode(
       robot::comm::EthercatProcessDataMode::ETHERCAT_PROCESS_DATA_MODE_SPLIT_LRD_LWR);
@@ -102,8 +104,7 @@ class Am243BoardTest : public ::testing::Test {
 
 TEST_F(Am243BoardTest, InitSucceedsAgainstAm243Identity) {
   serial_transport_->QueueResponse(MakeIdentifyResponse(1));
-  serial_transport_->QueueResponse(
-      MakeStatusResponse(JW1_CMD_CONFIGURE_CHANNEL, 0, JW1_STATUS_OK));
+  serial_transport_->QueueResponse(MakeStatusResponse(JW1_CMD_CONFIGURE_CHANNEL, 0, JW1_STATUS_OK));
   Am243Board board;
 
   EXPECT_TRUE(board.Init(MakeAm243Board()).ok());

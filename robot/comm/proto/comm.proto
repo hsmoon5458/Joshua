@@ -10,6 +10,15 @@ enum CommType {
   ETHERNET_UDP = 3;
 }
 
+// The communication behavior required by the consumer. CommType selects the
+// mechanism; TransportType selects the interface exposed by CommFactory.
+enum TransportType {
+  TRANSPORT_INVALID = 0;
+  BYTE_STREAM = 1;
+  MESSAGE = 2;
+  CYCLIC = 3;
+}
+
 message Comm {
   CommType comm_type = 1;
   oneof comm_config {
@@ -17,6 +26,7 @@ message Comm {
     EthercatConfig ethercat_config = 3;
     UdpConfig udp_config = 4;
   }
+  TransportType transport_type = 5;
 }
 
 message SerialConfig {

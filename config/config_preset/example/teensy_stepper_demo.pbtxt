@@ -26,6 +26,7 @@ robot {
     board_type: TEENSY41
     comm {
       comm_type: SERIAL
+      transport_type: MESSAGE
       serial_config { port: "/dev/ttyACM0" baudrate: 115200 }
     }
     firmware {
